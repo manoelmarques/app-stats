@@ -1,3 +1,13 @@
+# MacOSX
+.DS_Store
+
+# Dolphin KDE
+.directory
+
+# editor files
+.vscode/
+.idea/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
