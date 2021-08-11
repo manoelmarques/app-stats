@@ -1,0 +1,92 @@
+# This code is part of Qiskit.
+#
+# (C) Copyright IBM 2021.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+
+name: Qiskit Applications Statistics
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.ref }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs_publish:
+    if: ${{ contains('["manoelmarques","mtreinish","stefan-woerner","woodsp-ibm"]', github.actor) }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+    steps:
+      - name: Print Concurrency Group
+        env:
+          CONCURRENCY_GROUP: ${{ github.repository }}-${{ github.ref }}-${{ github.head_ref }}
+        run: |
+          echo -e "\033[31;1;4mConcurrency Group\033[0m"
+          echo -e "$CONCURRENCY_GROUP\n"
+        shell: bash
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          pip install -U pip
+          pip install -U -r requirements-dev.txt
+          sudo apt-get update -y
+          sudo apt-get install -y gnuplot
+          git clone git://github.com/hoxu/gitstats.git /tmp/gitstats
+        shell: bash
+      - name: Clone Applications
+        run: |
+          git clone https://github.com/Qiskit/qiskit-aqua.git /tmp/qiskit-aqua
+          git clone https://github.com/Qiskit/qiskit-finance.git /tmp/qiskit-finance
+          git clone https://github.com/Qiskit/qiskit-machine-learning.git /tmp/qiskit-machine-learning
+          git clone https://github.com/Qiskit/qiskit-nature.git /tmp/qiskit-nature
+          git clone https://github.com/Qiskit/qiskit-optimization.git /tmp/qiskit-optimization
+        shell: bash
+      - name: Generate Base Documentation
+        run: |
+          make html SPHINXOPTS=-W
+          mkdir /tmp/statistics
+          cp -rf docs/_build/html/. /tmp/statistics
+          make clean
+          git checkout gh-pages
+          GLOBIGNORE=.git
+          rm -rf * .*
+          unset GLOBIGNORE
+          cp -rf /tmp/statistics/. .
+        shell: bash
+      - name: Run gitstats
+        run: |
+          /tmp/gitstats/gitstats -c max_authors=99999 -c authors_top=99999 /tmp/qiskit-aqua ./aqua
+          /tmp/gitstats/gitstats -c max_authors=99999 -c authors_top=99999 /tmp/qiskit-finance ./finance
+          /tmp/gitstats/gitstats -c max_authors=99999 -c authors_top=99999 /tmp/qiskit-machine-learning ./machine_learning
+          /tmp/gitstats/gitstats -c max_authors=99999 -c authors_top=99999 /tmp/qiskit-nature ./nature
+          /tmp/gitstats/gitstats -c max_authors=99999 -c authors_top=99999 /tmp/qiskit-optimization ./optimization
+        shell: bash
+      - name: Commit Github Pages
+        run: |
+          git config user.name "Qiskit Applications Statistics Autodeploy"
+          git config user.email "qiskit@qiskit.org"
+          git add .
+          git commit -m "Statistics automated documentation update"
+          git push origin gh-pages
+        shell: bash
